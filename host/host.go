@@ -2,11 +2,10 @@ package host
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
 	"net"
-	"os"
 	"p2p/peer"
 )
 
@@ -21,91 +20,18 @@ type Host interface {
 	// ID returns the (local) peer.ID associated with this Host
 	ID() peer.ID
 
-	// Peerstore returns the Host's repository of Peer Addresses and Keys.
-	//Peerstore() peerstore.Peerstore
-
-	// Returns the listen addresses of the Host
+	// Addrs Returns the listen addresses of the Host
 	Addrs() []ma.Multiaddr
 
-	// Networks returns the Network interface of the Host
+	// Network  returns the Network interface of the Host
 	Network() net.Interface
 
 	// Mux returns the Mux multiplexing incoming streams to protocol handlers
-	//Mux() protocol.Switch
-
-	// Connect ensures there is a connection between this host and the peer with
-	// given peer.ID. Connect will absorb the addresses in pi into its internal
-	// peerstore. If there is not an active connection, Connect will issue a
-	// h.Network.Dial, and block until a connection is open, or an error is
-	// returned. // TODO: Relay + NAT.
-	//Connect(ctx context.Context, pi peer.AddrInfo) error
-
-	// SetStreamHandler sets the protocol handler on the Host's Mux.
-	// This is equivalent to:
-	//   host.Mux().SetHandler(proto, handler)
-	// (Threadsafe)
-	//SetStreamHandler(pid protocol.ID, handler network.StreamHandler)
-
-	// SetStreamHandlerMatch sets the protocol handler on the Host's Mux
-	// using a matching function for protocol selection.
-	//SetStreamHandlerMatch(protocol.ID, func(protocol.ID) bool, network.StreamHandler)
-
-	// RemoveStreamHandler removes a handler on the mux that was set by
-	// SetStreamHandler
-	//RemoveStreamHandler(pid protocol.ID)
-
-	// NewStream opens a new stream to given peer p, and writes a p2p/protocol
-	// header with given ProtocolID. If there is no connection to p, attempts
-	// to create one. If ProtocolID is "", writes no header.
-	// (Threadsafe)
-	//NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error)
-
-	// Close shuts down the host, its Network, and services.
-	//Close() error
-
-	// ConnManager returns this hosts connection manager
-	//ConnManager() connmgr.ConnManager
-
-	// EventBus returns the hosts eventbus
-	//EventBus() event.Bus
+	Mux() protocol.Switch
 }
 
-// getAddrFromUser takes in user input to return a multi address or an error
-func getAddrFromUser() (ma.Multiaddr, error) {
-	for {
-		fmt.Print("Enter the server multi-address (e.g., /ip4/127.0.0.1/tcp/8000): ")
-		scanner := bufio.NewScanner(os.Stdin)
-		scanner.Scan()
-		addrStr := scanner.Text()
-
-		// Parsing the entered multi-address.
-		addr, err := ma.NewMultiaddr(addrStr)
-		if err != nil {
-			fmt.Printf("Invalid multiaddress: %s, press r to retry or any other key to exit\n", err)
-			scanner.Scan()
-			input := scanner.Text()
-			if input == "r" {
-				continue
-			} else {
-
-				return nil, errors.New("exit from get Address")
-			}
-		} else {
-			return addr, nil
-		}
-	}
-}
-
-// printProtocols takes in a multi address and returns the list of protocols in the address
-func printProtocols(addr ma.Multiaddr) {
-	fmt.Printf("Protocols in Multiaddr %s are:\n", addr.String())
-	for _, protocol := range addr.Protocols() {
-		fmt.Println("PName", protocol.Name)
-	}
-}
-
-// receiveData reads data from the server and prints received messages.
-func receiveData(conn net.Conn) {
+// ReceiveData reads data from the server and prints received messages.
+func ReceiveData(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 
 	for {
@@ -121,14 +47,14 @@ func receiveData(conn net.Conn) {
 	}
 }
 
-func main() {
+/*func main() {
 
-	addr, err := getAddrFromUser()
+	addr, err := GetAddrFromUser()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	printProtocols(addr)
+	PrintProtocols(addr)
 	ipAddr, err := addr.ValueForProtocol(ma.P_IP4)
 	if err != nil {
 		fmt.Println("Could not get ipv4 address from the given multiadress")
@@ -165,4 +91,4 @@ func main() {
 
 	go receiveData(conn)
 
-}
+}*/
