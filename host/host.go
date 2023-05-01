@@ -29,7 +29,7 @@ type Host interface {
 	// Listener returns the Listener of the Host
 	Listener() net.Listener
 
-	StartListening()
+	StartListening() (net.Conn, error)
 
 	// Mux returns the Mux multiplexing incoming streams to protocol handlers
 	//Mux() proto.Switch
@@ -59,17 +59,13 @@ func (h *MyHost) Listener() net.Listener {
 	return h.listener
 }
 
-func (h *MyHost) StartListening() {
+func (h *MyHost) StartListening() (net.Conn, error) {
 	conn, err := h.Listener().Accept()
 	if err != nil {
 		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
+		return nil, err
 	}
-	var buf []byte
-	_, err = conn.Read(buf)
-	if err != nil {
-		fmt.Printf("Could not read because %s\n", err.Error())
-	}
-	fmt.Println(buf)
+	return conn, nil
 
 }
 

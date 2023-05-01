@@ -106,18 +106,9 @@ func main() {
 	fmt.Println(myHost.ID(), myHost.Addrs(), myHost.Network().HardwareAddr)
 	PrintProtocols(myHost.Addrs())
 
-	go myHost.StartListening()
+	listeningConn, _ := myHost.StartListening()
 
-	addr, _ := GetAddrFromUser()
-	conn, _ := connectTcpIp4(addr)
-	session, _ := setupSenderYamux(conn, nil)
-	newConn, _ := newStreamYamux(session)
-
-	_, err := newConn.Write([]byte("hello"))
-	if err != nil {
-		fmt.Println("error in writing:", err)
-		return
-	}
+	sendingConn := returnConn()
 
 	/*
 		addr, err := GetAddrFromUser()
@@ -159,4 +150,12 @@ func main() {
 	}
 	fmt.Println(conn.LocalAddr())*/
 
+}
+
+func returnConn() net.Conn {
+	addr, _ := GetAddrFromUser()
+	conn, _ := connectTcpIp4(addr)
+	session, _ := setupSenderYamux(conn, nil)
+	newConn, _ := newStreamYamux(session)
+	return newConn
 }
