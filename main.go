@@ -4,6 +4,7 @@ import (
 	"fmt"
 	ma "github.com/multiformats/go-multiaddr"
 	"p2p/host"
+	tr "p2p/transfer"
 )
 
 // PrintProtocols takes in a multi address and returns the list of protocols in the address
@@ -14,6 +15,12 @@ func PrintProtocols(addr ma.Multiaddr) {
 	}
 }
 
+const (
+	filename   = "random.txt"
+	inputPath  = "testingSender/random.txt"
+	outputPath = "testingReceiver/random.txt"
+)
+
 func main() {
 
 	//fmt.Printf("List the protocols you support. Don't lie and don't be shy, go ahead list em all")
@@ -23,6 +30,25 @@ func main() {
 	fmt.Println(myHost.ID(), myHost.Addrs(), myHost.Network().HardwareAddr)
 	PrintProtocols(myHost.Addrs())
 
+	testingTransferSender(myHost)
+	testingTransferReceiver(myHost)
+
+}
+
+func testingTransferReceiver(myHost host.Host) {
+	conn, err := myHost.StartListening()
+	if err != nil {
+		fmt.Println("Couldn't listen due to ", err.Error())
+	}
+	err = tr.ReceiveFile(conn, outputPath)
+}
+
+func testingTransferSender(myHost host.Host) {
+	sendingConn, _ := myHost.SenderConn()
+	err := tr.UploadFile(sendingConn, filename, inputPath, 5)
+	if err != nil {
+		fmt.Printf("error in upload file due to %s \n", err.Error())
+	}
 }
 
 func receiverMethod(myHost host.Host) {
