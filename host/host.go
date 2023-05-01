@@ -68,24 +68,8 @@ type MyHost struct {
 	listener   net.Listener
 	connection *net.TCPConn
 	lConn      *net.Conn
-	stream     *yamux.Stream
+	session    *yamux.Session
 	//mux     proto.Switch
-}
-
-func (h *MyHost) NewStream() (*yamux.Stream, error) {
-	con := h.connection
-	if con == nil {
-		fmt.Printf("No connection found to stream over")
-		return nil, errors.New("no connection found to stream over")
-	}
-	yamuxConn, err := setupSenderYamux(con, nil)
-	k, err := yamuxConn.OpenStream()
-	if err != nil {
-		fmt.Printf("Error opening a new stream because of %s\n", err)
-		return nil, err
-	}
-	return k, nil
-
 }
 
 // ID returns the peer ID associated with this host
@@ -113,9 +97,52 @@ func (h *MyHost) Connection() *net.TCPConn {
 	return h.connection
 }
 
+func (h *MyHost) NewStream() (*yamux.Stream, error) {
+	con := h.connection
+	if con == nil {
+		fmt.Printf("No connection found to stream over")
+		return nil, errors.New("no connection found to stream over")
+	}
+
+	yamuxSession, err := yamux.Server(con, nil)
+	defer func(yamuxSession *yamux.Session) {
+		err := yamuxSession.Close()
+		if err != nil {
+			fmt.Printf("error %s/n", err.Error())
+		}
+	}(yamuxSession)
+	//yamuxSession, err := setupSenderYamux(con, nil)
+
+	if err != nil {
+		fmt.Printf("Error opening a new stream because of %s\n", err)
+		return nil, err
+	}
+
+	stream, err := yamuxSession.AcceptStream()
+	if err != nil {
+		// Ignore the error if it's related to the session being closed
+		if err != yamux.ErrSessionShutdown {
+			panic(err)
+		}
+	}
+	defer func(stream *yamux.Stream) {
+		err := stream.Close()
+		if err != nil {
+			fmt.Printf("error::%s \n", err.Error())
+		}
+	}(stream)
+	return stream, nil
+
+}
+
 // StartListening listens to incoming connections on the listener
 func (h *MyHost) StartListening() (net.Conn, error) {
 	conn, err := h.Listener().Accept()
+	tcpConn, ok := conn.(*net.TCPConn)
+	if !ok {
+		fmt.Printf("Could not resolve Conn to TCPConn\n")
+	}
+	h.connection = tcpConn
 	fmt.Printf("conected to %s \n", conn.RemoteAddr())
 	if err != nil {
 		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
@@ -148,21 +175,6 @@ func (h *MyHost) StartListening() (net.Conn, error) {
 
 }
 
-func (h *MyHost) StartReceiveFile() {
-	conn, err := h.Listener().Accept()
-	fmt.Printf("conected to %s \n", conn.RemoteAddr())
-	if err != nil {
-		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
-	}
-	err = tr.ReceiveFile(conn, outputPath)
-	if err != nil {
-		err := fmt.Errorf("rrror in 'receiveFile': %s", err.Error())
-		println(err.Error())
-
-	}
-
-}
-
 // StartSending returns a new connection to the destination.
 func (h *MyHost) StartSending() (net.Conn, error) {
 	// Get the destination address from the user.
@@ -184,8 +196,10 @@ func (h *MyHost) StartSending() (net.Conn, error) {
 		return nil, err
 	}
 
+	h.session = session
+
 	// Open a new stream over the yamux session.
-	newConn, err := newStreamYamux(session)
+	newConn, err := newConnYamux(session)
 	if err != nil {
 		return nil, err
 	}
@@ -200,6 +214,34 @@ func (h *MyHost) StartSending() (net.Conn, error) {
 	return newConn, nil
 }
 
+// NewConn returns a new stream if session is not nil
+func (h *MyHost) NewConn() (net.Conn, error) {
+	if h.connection == nil {
+		return nil, errors.New("no Connection to multiplex over")
+	}
+
+	conn, err := newConnYamux(h.session)
+	if err != nil {
+		fmt.Printf("Could not create a new stream because of %s \n", err.Error())
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (h *MyHost) StartReceiveFile() {
+	conn, err := h.Listener().Accept()
+	fmt.Printf("conected to %s \n", conn.RemoteAddr())
+	if err != nil {
+		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
+	}
+	err = tr.ReceiveFile(conn, outputPath)
+	if err != nil {
+		err := fmt.Errorf("rrror in 'receiveFile': %s", err.Error())
+		println(err.Error())
+
+	}
+
+}
 func (h *MyHost) StartTransferFile() {
 	// Get the destination address from the user.
 	addr, err := GetAddrFromUser()
@@ -221,7 +263,7 @@ func (h *MyHost) StartTransferFile() {
 	}
 
 	// Open a new stream over the yamux session.
-	newConn, err := newStreamYamux(session)
+	newConn, err := newConnYamux(session)
 	if err != nil {
 		fmt.Printf("Unable to send over streaed connection because %s\n", err.Error())
 	}
@@ -232,27 +274,6 @@ func (h *MyHost) StartTransferFile() {
 	if err != nil {
 		fmt.Printf("Could not write on stream because %s\n", err.Error())
 	}
-}
-
-// NewConn returns a new stream if session is not nil
-func (h *MyHost) NewConn() (net.Conn, error) {
-	if h.connection == nil {
-		return nil, errors.New("no Connection to multiplex over")
-	}
-
-	// Set up a new yamux session for the connection.
-	session, err := setupSenderYamux(h.connection, nil)
-	if err != nil {
-		fmt.Printf("Can not create a new session because %s\n", err.Error())
-		return nil, err
-	}
-
-	conn, err := newStreamYamux(session)
-	if err != nil {
-		fmt.Printf("Could not create a new stream because of %s \n", err.Error())
-		return nil, err
-	}
-	return conn, nil
 }
 
 // getMyMultiaddr returns the IP address and multiaddress of the specified network interface and TCP port.
@@ -348,7 +369,7 @@ func GetHost(port string) Host {
 		network:    *network,
 		listener:   listener,
 		connection: nil,
-		stream:     nil,
+		session:    nil,
 		lConn:      nil,
 	}
 	return host
@@ -410,6 +431,7 @@ func connectTcpIp4(addr ma.Multiaddr) (*net.TCPConn, error) {
 // setupSenderYamux returns yamux session after taking in connection and config
 // set config to nil for default configuration
 func setupSenderYamux(conn io.ReadWriteCloser, config *yamux.Config) (*yamux.Session, error) {
+
 	session, err := yamux.Client(conn, config)
 	if err != nil {
 		fmt.Printf("Could not wrap yamux on connection because %s \n", err.Error())
@@ -429,7 +451,7 @@ func newStream(sess *yamux.Session) (*yamux.Stream, error) {
 }
 
 // newStream takes in a yamux session and returns a multiplexed connection
-func newStreamYamux(session *yamux.Session) (net.Conn, error) {
+func newConnYamux(session *yamux.Session) (net.Conn, error) {
 	stream, err := session.Open()
 	if err != nil {
 		fmt.Printf("Error opening a new Stream:%s \n", err.Error())
