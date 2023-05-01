@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/perlin-network/noise"
 	"github.com/perlin-network/noise/kademlia"
-	"os"
 	"p2p/host"
 )
 
@@ -95,7 +93,7 @@ func main() {
 	//testingTransferSender(myHost)
 	//testingTransferReceiver(myHost)
 
-	scanner := bufio.NewScanner(os.Stdin)
+	/*scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	input := scanner.Text()
 	if input == "rec" {
@@ -117,7 +115,7 @@ func main() {
 		if input == "go" {
 			sendAgain(myHost)
 		}
-	}
+	}*/
 
 	/*scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()

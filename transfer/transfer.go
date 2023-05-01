@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -24,8 +25,8 @@ const (
 	PORT       = "8080"
 	TYPE       = "tcp"
 	filename   = "random.txt"
-	inputPath  = "/Users/zubintobias/GolandProjects/Testing/in/random.txt"
-	outputPath = "/Users/zubintobias/GolandProjects/Testing/out"
+	inputPath  = "testingSender/random.txt"
+	outputPath = "testingReceiver"
 )
 
 func main() {
@@ -51,7 +52,7 @@ func main() {
 		} else {
 			println("connection ", conn)
 		}
-		err = UploadFile(conn, filename, inputPath, 8)
+		err = UploadFile(conn, filename, inputPath, 64)
 		if err != nil {
 			fmt.Errorf("Error in 'uploadFile': %s", err.Error())
 		}
@@ -135,12 +136,12 @@ func sendPacket(conn net.Conn, packet Packet) error {
 	if err != nil {
 		return fmt.Errorf("error encoding packet size: %v", err)
 	}
-
+	fmt.Println("SENDER_BLK_PACK_SIZE", packet.Size)
 	_, err = buf.Write(packet.Data)
 	if err != nil {
 		return fmt.Errorf("error writing packet data to buffer: %v", err)
 	}
-
+	fmt.Println("SENDER_BLK_PACK_data", packet.Data)
 	_, err = conn.Write(buf.Bytes())
 	if err != nil {
 		return fmt.Errorf("error sending packet: %v", err)
@@ -149,41 +150,121 @@ func sendPacket(conn net.Conn, packet Packet) error {
 	return nil
 }
 
+//func ReceiveFile(conn net.Conn, outputPath string) error {
+//	reader := bufio.NewReader(conn)
+//
+//	filename, err := reader.ReadString('\n')
+//	if err != nil {
+//		return fmt.Errorf("error reading filename: %v", err)
+//	}
+//	filename = strings.TrimSpace(filename)
+//
+//	fileSizeStr, err := reader.ReadString('\n')
+//	if err != nil {
+//		return fmt.Errorf("error reading file size: %v", err)
+//	}
+//	fileSizeStr = strings.TrimSpace(fileSizeStr)
+//	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
+//	if err != nil {
+//		return fmt.Errorf("error parsing file size: %v", err)
+//	}
+//
+//	err = os.MkdirAll(outputPath, 0755)
+//
+//	if err != nil {
+//		fmt.Println(4)
+//		return fmt.Errorf("error creating output file directory: %v", err)
+//	}
+//
+//	cleanFPath := strings.Replace(path.Join(outputPath, filename), "\r", "", -1)
+//	cleanFPath = strings.Replace(cleanFPath, "\x00", "", -1)
+//	cleanFPath = strings.Replace(cleanFPath, "\x01", "", -1)
+//	cleanFPath = strings.Replace(cleanFPath, "\v", "", -1)
+//	fmt.Printf("%q", cleanFPath)
+//	outputFile, err := os.Create(cleanFPath)
+//	if err != nil {
+//		fmt.Println(5)
+//		return fmt.Errorf("error creating output file: %v", err)
+//	}
+//
+//	defer outputFile.Close()
+//
+//	var receivedBytes int64
+//	for receivedBytes < fileSize {
+//		packet, err := receivePacket(conn)
+//		if err != nil {
+//			return err
+//		}
+//
+//		outputFile.Write(packet.Data)
+//		receivedBytes += int64(packet.Size)
+//	}
+//
+//	return nil
+//}
+
 // ReceiveFile receives a file from a connected sender over the specified net.Conn.
 func ReceiveFile(conn net.Conn, outputPath string) error {
 	reader := bufio.NewReader(conn)
+	println("reader size: ", reader.Size())
 
 	filename, err := reader.ReadString('\n')
 	if err != nil {
+		fmt.Println(1)
 		return fmt.Errorf("error reading filename: %v", err)
 	}
 	filename = strings.TrimSpace(filename)
 
 	fileSizeStr, err := reader.ReadString('\n')
 	if err != nil {
+		fmt.Println(2)
 		return fmt.Errorf("error reading file size: %v", err)
 	}
-	fileSizeStr = strings.TrimSpace(fileSizeStr)
-	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
+	fileSizeInfo := strings.TrimSpace(fileSizeStr)
+	fileSizeInfo = fileSizeInfo[len(fileSizeInfo)-3:]
+	println("File size found ", fileSizeInfo)
+	fileSize, err := strconv.ParseInt(fileSizeInfo, 10, 16)
 	if err != nil {
+		fmt.Println(3)
 		return fmt.Errorf("error parsing file size: %v", err)
 	}
 
-	outputFile, err := os.Create(outputPath + "/" + filename)
+	err = os.MkdirAll(outputPath, 0755)
+
 	if err != nil {
+		fmt.Println(4)
+		return fmt.Errorf("error creating output file directory: %v", err)
+	}
+
+	cleanFPath := strings.Replace(path.Join(outputPath, filename), "\r", "", -1)
+	cleanFPath = strings.Replace(cleanFPath, "\x00", "", -1)
+	cleanFPath = strings.Replace(cleanFPath, "\x01", "", -1)
+	cleanFPath = strings.Replace(cleanFPath, "\v", "", -1)
+	fmt.Printf("%q", cleanFPath)
+	outputFile, err := os.Create(cleanFPath)
+	if err != nil {
+		fmt.Println(5)
 		return fmt.Errorf("error creating output file: %v", err)
 	}
 	defer outputFile.Close()
 
 	var receivedBytes int64
-	for receivedBytes < fileSize {
+	fmt.Println("Full file size", fileSize)
+	for receivedBytes < int64(fileSize) {
 		packet, err := receivePacket(conn)
+
 		if err != nil {
+			fmt.Println(6)
 			return err
 		}
+		fmt.Println("PSIZE", packet.Size)
 
-		outputFile.Write(packet.Data)
-		receivedBytes += int64(packet.Size)
+		if len(packet.Data) == 0 {
+			break
+		} else {
+			outputFile.Write(packet.Data)
+			receivedBytes += int64(packet.Size)
+		}
 	}
 
 	return nil
@@ -193,16 +274,32 @@ func ReceiveFile(conn net.Conn, outputPath string) error {
 func receivePacket(conn net.Conn) (Packet, error) {
 	var packet Packet
 
+	//d, err := io.ReadAll(conn)
+	//
+	//if err != nil {
+	//	return packet, fmt.Errorf("error decoding packet size: %v", err)
+	//}
+	//
+	//fmt.Println(d)
+
 	err := binary.Read(conn, binary.BigEndian, &packet.Size)
 	if err != nil {
 		return packet, fmt.Errorf("error decoding packet size: %v", err)
 	}
 
-	packet.Data = make([]byte, packet.Size)
-	_, err = io.ReadFull(conn, packet.Data)
+	fmt.Println("RECPACK SIZE", packet.Size)
+
+	packet.Size = 8
+	packet.Data = make([]byte, 8)
+
+	_, err = io.ReadAtLeast(conn, packet.Data, int(packet.Size))
 	if err != nil {
 		return packet, fmt.Errorf("error reading packet data: %v", err)
 	}
+
+	packet.Data = []byte(strings.Replace(string(packet.Data), "\x00", "", -1))
+	packet.Data = []byte(strings.Replace(string(packet.Data), "\x01", "", -1))
+	//packet.Data = []byte(strings.Replace(string(packet.Data), "\x0c", "", -1))
 
 	return packet, nil
 }
