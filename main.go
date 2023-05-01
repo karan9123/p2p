@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/perlin-network/noise"
 	"github.com/perlin-network/noise/kademlia"
+	"os"
 	"p2p/host"
 	tr "p2p/transfer"
 )
@@ -26,15 +28,49 @@ const (
 
 func main() {
 
-	myHost := host.GetHost("5007")
-	fmt.Println(myHost.ID(), myHost.Addrs(), myHost.Network().HardwareAddr)
-	PrintProtocols(myHost.Addrs())
+	myHost := host.GetHost("5001")
+	/*myPubKey, err := myHost.ID().ExtractPublicKey()
+	if err != nil {
+		fmt.Printf("Could not extract Public Key from Peer ID because of %s \n", err.Error())
+	}*/
+	fmt.Printf("ID: %s\nAddress: %s\n", myHost.ID(), myHost.Addrs())
 
 	//testingTransferSender(myHost)
 	//testingTransferReceiver(myHost)
 
-	//receiverMethod(myHost)
-	senderMethod(myHost)
+	/*scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	input := scanner.Text()
+	if input == "rec" {
+		receiverMethod(myHost)
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		input := scanner.Text()
+		if input == "go" {
+			fmt.Printf("in receive go\n")
+			receiveAgain(myHost)
+		}
+	}
+
+	if input == "send" {
+		senderMethod(myHost)
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		input := scanner.Text()
+		if input == "go" {
+			sendAgain(myHost)
+		}
+	}
+	*/
+
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	input := scanner.Text()
+	if input == "rec" {
+		myHost.StartReceiveFile()
+	} else if input == "send" {
+		myHost.StartTransferFile()
+	}
 
 }
 
@@ -105,8 +141,9 @@ func testingTransferReceiver(myHost host.Host) {
 }
 
 func testingTransferSender(myHost host.Host) {
-	sendingConn, _ := myHost.SenderConn()
-	err := tr.UploadFile(sendingConn, filename, inputPath, 8)
+	_, _ = myHost.StartSending()
+	sendingConn, err := myHost.NewConn()
+	err = tr.UploadFile(sendingConn, filename, inputPath, 8)
 	if err != nil {
 		fmt.Printf("error in upload file due to %s \n", err.Error())
 	}
@@ -117,11 +154,32 @@ func receiverMethod(myHost host.Host) {
 }
 
 func senderMethod(myHost host.Host) {
-	_, _ = myHost.SenderConn()
-	//i, err := sendingConn.Write([]byte("hello\n"))
-	//if err != nil {
-	//	return
-	//}
-	//fmt.Printf("Wrote %d bytes\n", i)
+	_, _ = myHost.StartSending()
+
+}
+
+func sendAgain(myHost host.Host) {
+	sendingConn, err := myHost.NewConn()
+	i, err := sendingConn.Write([]byte("hello, This is sent over a new " +
+		"Stream using the same connection. Isn't it efficient???\n"))
+	if err != nil {
+		return
+	}
+	fmt.Printf("Wrote %d bytes\n", i)
+}
+
+func receiveAgain(myHost host.Host) {
+	fmt.Printf("In receive again %s\n", myHost.Listener().Addr())
+	listener, err := myHost.NewStream()
+	if err != nil {
+		fmt.Printf("Can't listen on %s because %s \n", myHost.Listener().Addr().String(), err.Error())
+	}
+	fmt.Printf("Listening on %s/n", listener.LocalAddr())
+	buf := make([]byte, 1024)
+	i, err := listener.Read(buf)
+	if err != nil {
+		fmt.Printf("Error %s encountered while readin\n", err.Error())
+	}
+	fmt.Printf("reading %d bytes which are: %s\n", i, buf[:i])
 
 }

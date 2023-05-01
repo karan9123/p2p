@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -19,12 +20,15 @@ type Packet struct {
 }
 
 const (
-	filename1  = "random.txt"
-	inputPath  = "/Users/karan/Documents/Networks/p2p/testingSender/random.txt"
-	outputPath = "/Users/karan/Documents/Networks/p2p/testingReceiver"
+	HOST       = "localhost"
+	PORT       = "8080"
+	TYPE       = "tcp"
+	filename   = "random.txt"
+	inputPath  = "/Users/zubintobias/GolandProjects/Testing/in/random.txt"
+	outputPath = "/Users/zubintobias/GolandProjects/Testing/out"
 )
 
-/*func main() {
+func main() {
 	// Call uploadFile and receiveFile with your specific parameters
 	//	I need to check the command line for the mode = (sender/receiver)
 
@@ -77,7 +81,7 @@ const (
 		}
 	}
 
-}*/
+}
 
 // UploadFile sends a file to a connected receiver over the specified net.Conn.
 func UploadFile(conn net.Conn, filename, inputPath string, blockSize int) error {
@@ -154,33 +158,24 @@ func ReceiveFile(conn net.Conn, outputPath string) error {
 		return fmt.Errorf("error reading filename: %v", err)
 	}
 	filename = strings.TrimSpace(filename)
-	fmt.Printf("fileName: %s \n", filename)
 
 	fileSizeStr, err := reader.ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("error reading file size: %v", err)
 	}
-	fmt.Printf("filesizeStr: %s\n", fileSizeStr)
-	fileSizeStr = strings.ReplaceAll(fileSizeStr, " ", "")
-	fileSizeStr = strings.ReplaceAll(fileSizeStr, "\n", "")
-	fmt.Println("f", fileSizeStr)
-	k := string(fileSizeStr)
-	fmt.Println("k", []byte(k))
-	fileSize, err := strconv.Atoi(k)
+	fileSizeStr = strings.TrimSpace(fileSizeStr)
+	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
 	if err != nil {
-		fmt.Printf("error converting file size because of%s\n", err.Error())
-
+		return fmt.Errorf("error parsing file size: %v", err)
 	}
-	fmt.Println("filesize:", fileSize)
 
-	outputFile, err := os.Create(outputPath + "/random.txt")
+	outputFile, err := os.Create(outputPath + "/" + filename)
 	if err != nil {
 		return fmt.Errorf("error creating output file: %v", err)
 	}
 	defer outputFile.Close()
-	fmt.Printf("file %s created\n", outputFile)
 
-	var receivedBytes int
+	var receivedBytes int64
 	for receivedBytes < fileSize {
 		packet, err := receivePacket(conn)
 		if err != nil {
@@ -188,7 +183,7 @@ func ReceiveFile(conn net.Conn, outputPath string) error {
 		}
 
 		outputFile.Write(packet.Data)
-		receivedBytes += int(packet.Size)
+		receivedBytes += int64(packet.Size)
 	}
 
 	return nil

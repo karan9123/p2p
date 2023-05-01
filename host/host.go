@@ -18,12 +18,17 @@ import (
 	"os"
 	cr "p2p/crypto"
 	"p2p/peer"
+	tr "p2p/transfer"
 )
 
 // The string used for the multistream select protocol negotiation
 const (
 	multiStreamSelect   = "/multistream/1.0.0"
 	multiStreamSelectNL = "/multistream/1.0.0\n"
+
+	filename   = "random.txt"
+	inputPath  = "/Users/karan/Documents/Networks/p2p/testingSender/random.txt"
+	outputPath = "/Users/karan/Documents/Networks/p2p/testingReceiver"
 )
 
 // Host represents a single libp2p node in a peer-to-peer network.
@@ -42,19 +47,45 @@ type Host interface {
 	Network() net.Interface
 	// Listener returns the Listener of the Host
 	Listener() net.Listener
+	// Connection returns the TCPConnection to peer of the host
+	Connection() *net.TCPConn
 	// StartListening listens to incoming connections on the listener
 	StartListening() (net.Conn, error)
 	// SenderConn creates a new outgoing connection
-	SenderConn() (net.Conn, error)
+	StartSending() (net.Conn, error)
+	// NewConn returns a new stream if session is not nil
+	NewConn() (net.Conn, error)
+	NewStream() (*yamux.Stream, error)
+	StartReceiveFile()
+	StartTransferFile()
 }
 
 // MyHost is an implementation of Host interface
 type MyHost struct {
-	peerID   peer.ID
-	addrs    ma.Multiaddr
-	network  net.Interface
-	listener net.Listener
+	peerID     peer.ID
+	addrs      ma.Multiaddr
+	network    net.Interface
+	listener   net.Listener
+	connection *net.TCPConn
+	lConn      *net.Conn
+	stream     *yamux.Stream
 	//mux     proto.Switch
+}
+
+func (h *MyHost) NewStream() (*yamux.Stream, error) {
+	con := h.connection
+	if con == nil {
+		fmt.Printf("No connection found to stream over")
+		return nil, errors.New("no connection found to stream over")
+	}
+	yamuxConn, err := setupSenderYamux(con, nil)
+	k, err := yamuxConn.OpenStream()
+	if err != nil {
+		fmt.Printf("Error opening a new stream because of %s\n", err)
+		return nil, err
+	}
+	return k, nil
+
 }
 
 // ID returns the peer ID associated with this host
@@ -77,9 +108,15 @@ func (h *MyHost) Listener() net.Listener {
 	return h.listener
 }
 
+// Connection returns the TCPConnection to peer of the host
+func (h *MyHost) Connection() *net.TCPConn {
+	return h.connection
+}
+
 // StartListening listens to incoming connections on the listener
 func (h *MyHost) StartListening() (net.Conn, error) {
 	conn, err := h.Listener().Accept()
+	fmt.Printf("conected to %s \n", conn.RemoteAddr())
 	if err != nil {
 		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
 		return nil, err
@@ -96,61 +133,149 @@ func (h *MyHost) StartListening() (net.Conn, error) {
 		fmt.Printf("Error %s encountered while readed\n", err.Error())
 		return nil, err
 	}
-	temp := string(buf[:i-1])
+	//temp := string(buf[:i-1])
 
 	tempbuf := buf[:i-1]
 
-	fmt.Printf("reading again %d bytes which are: %s and multi is %s\n", i, "|"+temp+"|", "|"+multiStreamSelect+"|")
+	fmt.Printf("reading again %d bytes which are: %s and multi is %s\n", i, "|"+string(tempbuf[len(tempbuf)-18:])+"|", "|"+multiStreamSelect+"|")
 	if string(tempbuf[len(tempbuf)-18:]) != multiStreamSelect {
 		fmt.Printf("Sender does not support multisteam select, Abort connection\n")
 		return nil, errors.New("sender does not multi-stream-select")
 	}
 	fmt.Printf("Sender supports multisteam select. Hooray!!!\n")
+
 	return conn, nil
 
 }
 
-func (h *MyHost) SenderConn() (net.Conn, error) {
+func (h *MyHost) StartReceiveFile() {
+	conn, err := h.Listener().Accept()
+	fmt.Printf("conected to %s \n", conn.RemoteAddr())
+	if err != nil {
+		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
+	}
+	err = tr.ReceiveFile(conn, outputPath)
+	if err != nil {
+		err := fmt.Errorf("rrror in 'receiveFile': %s", err.Error())
+		println(err.Error())
+
+	}
+
+}
+
+// StartSending returns a new connection to the destination.
+func (h *MyHost) StartSending() (net.Conn, error) {
+	// Get the destination address from the user.
 	addr, err := GetAddrFromUser()
 	if err != nil {
 		return nil, err
 	}
+	// Connect to the destination address over TCP/IP.
 	conn, err := connectTcpIp4(addr)
 	if err != nil {
 		return nil, err
 	}
+
+	h.connection = conn
+
+	// Set up a new yamux session for the connection.
 	session, err := setupSenderYamux(conn, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	// Open a new stream over the yamux session.
 	newConn, err := newStreamYamux(session)
 	if err != nil {
 		return nil, err
 	}
+
+	// Write the stream select message to the new stream.
 	_, err = newConn.Write([]byte(multiStreamSelectNL))
 	if err != nil {
 		fmt.Printf("Could not write on stream because %s\n", err.Error())
 		return nil, err
 	}
+
 	return newConn, nil
 }
 
+func (h *MyHost) StartTransferFile() {
+	// Get the destination address from the user.
+	addr, err := GetAddrFromUser()
+	if err != nil {
+		fmt.Printf("Unable to get add because %s\n", err.Error())
+	}
+	// Connect to the destination address over TCP/IP.
+	conn, err := connectTcpIp4(addr)
+	if err != nil {
+		fmt.Printf("Unable to connect TCP because %s\n", err.Error())
+	}
+
+	h.connection = conn
+
+	// Set up a new yamux session for the connection.
+	session, err := setupSenderYamux(conn, nil)
+	if err != nil {
+		fmt.Printf("Unable to set up Yamux because %s\n", err.Error())
+	}
+
+	// Open a new stream over the yamux session.
+	newConn, err := newStreamYamux(session)
+	if err != nil {
+		fmt.Printf("Unable to send over streaed connection because %s\n", err.Error())
+	}
+
+	// Write the stream select message to the new stream.
+
+	err = tr.UploadFile(newConn, filename, inputPath, 8)
+	if err != nil {
+		fmt.Printf("Could not write on stream because %s\n", err.Error())
+	}
+}
+
+// NewConn returns a new stream if session is not nil
+func (h *MyHost) NewConn() (net.Conn, error) {
+	if h.connection == nil {
+		return nil, errors.New("no Connection to multiplex over")
+	}
+
+	// Set up a new yamux session for the connection.
+	session, err := setupSenderYamux(h.connection, nil)
+	if err != nil {
+		fmt.Printf("Can not create a new session because %s\n", err.Error())
+		return nil, err
+	}
+
+	conn, err := newStreamYamux(session)
+	if err != nil {
+		fmt.Printf("Could not create a new stream because of %s \n", err.Error())
+		return nil, err
+	}
+	return conn, nil
+}
+
+// getMyMultiaddr returns the IP address and multiaddress of the specified network interface and TCP port.
 func getMyMultiaddr(inface, tcpPort string) (*net.Interface, ma.Multiaddr, error) {
+	// Get the network interface by name.
 	iface, err := net.InterfaceByName(inface)
 	if err != nil {
 		fmt.Printf("Could not find the interface because %s \n", err.Error())
 		return nil, nil, err
 	}
-
+	// Get the interface's addresses.
 	addrs, err := iface.Addrs()
 	if err != nil {
 		fmt.Println(err)
 		return iface, nil, err
 	}
 
-	for _, add := range addrs {
-		fmt.Println(add.Network(), add.String())
-	}
+	/*	// Print the network interface's addresses.
+		for _, add := range addrs {
+			fmt.Println(add.Network(), add.String())
+		}*/
+
+	// Find the first IPv4 address that is not a loopback address.
 	var ipAddress net.IP
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
@@ -161,9 +286,8 @@ func getMyMultiaddr(inface, tcpPort string) (*net.Interface, ma.Multiaddr, error
 		}
 	}
 
+	// Construct a multiaddress from the IP address and TCP port.
 	addrStr := "/ip4/" + ipAddress.String() + "/tcp/" + tcpPort
-
-	// Parsing the entered multi-address./ip4/127.0.0.1/tcp/8000
 	addr, err := ma.NewMultiaddr(addrStr)
 	if err != nil {
 		fmt.Printf("Invalid multiaddress: %s, press r to retry or any other key to exit\n", err)
@@ -191,39 +315,64 @@ func _(conn net.Conn) []byte {
 	return returnLst
 }
 
+// GetHost returns a new Host object after generating a key pair, obtaining the local IPv4 address and TCP port,
+// and setting up a TCP listener.
+// Parameters:
+// - port: a string representing the port number to listen to.
+// Returns:
+// - a Host object representing the local host.
 func GetHost(port string) Host {
+	// Generate a key pair and obtain the peer ID.
 	_, pubKey, _ := cr.GenerateKeyPair(1, -1)
 	id, _ := peer.GenerateIDFromPubKey(pubKey)
 
-	fmt.Printf("pubkey is %s, id is %s\n", pubKey, id)
+	// Obtain the local multiaddress, IPv4 address, and TCP port.
 	network, addrs, _ := getMyMultiaddr("en0", port)
 	ip4, tcpPort, _ := GetIp4TcpFromMultiaddr(addrs)
 
+	// Set up a TCP listener on the local IPv4 address and TCP port.
 	listener, err := net.Listen("tcp", ip4+":"+tcpPort)
 	if err != nil {
+		// Print an error message if the TCP listener could not be set up.
 		fmt.Printf("Could not listen on Address %s \n because %s", ip4+":"+tcpPort, err.Error())
 	}
-	fmt.Println("my ID:", []byte(id))
-	fmt.Println("listening on port: ", tcpPort)
 
+	/*	// Print out the peer ID and TCP port for debugging purposes.
+		fmt.Println("my ID:", []byte(id))
+		fmt.Println("listening on port: ", tcpPort)*/
+
+	// Create a new MyHost object with the obtained parameters and return it as a Host object.
 	host := &MyHost{
-		peerID:   id,
-		addrs:    addrs,
-		network:  *network,
-		listener: listener,
+		peerID:     id,
+		addrs:      addrs,
+		network:    *network,
+		listener:   listener,
+		connection: nil,
+		stream:     nil,
+		lConn:      nil,
 	}
 	return host
 }
 
+// GetIp4TcpFromMultiaddr extracts the IPv4 address and TCP port from a given multiaddress.
+// Parameters:
+// - addr: a Multiaddr object representing the multiaddress to extract from.
+// Returns:
+// - a string representing the IPv4 address.
+// - a string representing the TCP port.
+// - an error object if either the IPv4 address or TCP port could not be extracted.
 func GetIp4TcpFromMultiaddr(addr ma.Multiaddr) (string, string, error) {
+	// Extract the IPv4 address from the given multiaddress.
 	ipAddr, err := addr.ValueForProtocol(ma.P_IP4)
 	if err != nil {
+		// Print an error message if the IPv4 address could not be extracted.
 		fmt.Printf("Could not get ipv4 address from the given multiadress because %s \n", err.Error())
 		return "", "", err
 	}
-
+	// Extract the TCP port from the given multiaddress.
 	tcpPort, err := addr.ValueForProtocol(ma.P_TCP)
 	if err != nil {
+		// Print an error message if the TCP port could not be extracted.
 		fmt.Printf("Could not get TCP Port from the given multiadress %s \n", err.Error())
 		return ipAddr, "", err
 	}
@@ -267,6 +416,16 @@ func setupSenderYamux(conn io.ReadWriteCloser, config *yamux.Config) (*yamux.Ses
 		return nil, err
 	}
 	return session, nil
+}
+
+func newStream(sess *yamux.Session) (*yamux.Stream, error) {
+	k, err := sess.OpenStream()
+	if err != nil {
+		fmt.Printf("Error opening a new stream because of %s\n", err)
+		return nil, err
+	}
+	return k, nil
+
 }
 
 // newStream takes in a yamux session and returns a multiplexed connection
