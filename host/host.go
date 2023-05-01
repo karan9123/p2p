@@ -25,10 +25,10 @@ import (
 const (
 	multiStreamSelect   = "/multistream/1.0.0"
 	multiStreamSelectNL = "/multistream/1.0.0\n"
-
-	filename   = "random.txt"
-	inputPath  = "/Users/karan/Documents/Networks/p2p/testingSender/random.txt"
-	outputPath = "/Users/karan/Documents/Networks/p2p/testingReceiver"
+	filename            = "random.txt"
+	inputPath           = "/Users/karan/Documents/Networks/p2p/testingSender/random.txt"
+	outputPath          = "/Users/karan/Documents/Networks/p2p/testingReceiver"
+	ifaceName           = "eth0" //change it to "en0" if you are on a Mac
 )
 
 // Host represents a single libp2p node in a peer-to-peer network.
@@ -51,10 +51,11 @@ type Host interface {
 	Connection() *net.TCPConn
 	// StartListening listens to incoming connections on the listener
 	StartListening() (net.Conn, error)
-	// SenderConn creates a new outgoing connection
+	// StartSending creates a new outgoing connection
 	StartSending() (net.Conn, error)
 	// NewConn returns a new stream if session is not nil
 	NewConn() (net.Conn, error)
+	// NewStream returns a new
 	NewStream() (*yamux.Stream, error)
 	StartReceiveFile()
 	StartTransferFile()
@@ -69,7 +70,6 @@ type MyHost struct {
 	connection *net.TCPConn
 	lConn      *net.Conn
 	session    *yamux.Session
-	//mux     proto.Switch
 }
 
 // ID returns the peer ID associated with this host
@@ -348,7 +348,9 @@ func GetHost(port string) Host {
 	id, _ := peer.GenerateIDFromPubKey(pubKey)
 
 	// Obtain the local multiaddress, IPv4 address, and TCP port.
-	network, addrs, _ := getMyMultiaddr("eth0", port)
+
+	network, addrs, _ := getMyMultiaddr(ifaceName, port)
+
 	ip4, tcpPort, _ := GetIp4TcpFromMultiaddr(addrs)
 
 	// Set up a TCP listener on the local IPv4 address and TCP port.
@@ -357,10 +359,6 @@ func GetHost(port string) Host {
 		// Print an error message if the TCP listener could not be set up.
 		fmt.Printf("Could not listen on Address %s \n because %s", ip4+":"+tcpPort, err.Error())
 	}
-
-	/*	// Print out the peer ID and TCP port for debugging purposes.
-		fmt.Println("my ID:", []byte(id))
-		fmt.Println("listening on port: ", tcpPort)*/
 
 	// Create a new MyHost object with the obtained parameters and return it as a Host object.
 	host := &MyHost{

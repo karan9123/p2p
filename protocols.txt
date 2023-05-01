@@ -1,2 +1,10 @@
+FormatName,Format,FormatVersion
 Default,ipfs/0.1.0,1
 ID,/ipfs/id/1.0.0,1
+IP4,/ip4,1
+TCP,/tcp,1
+Yamux,/Yamux,1
+Multistream-Connect,/multistream/1.0.0,1
+ED25519,/peer/12D3KooWD3eckifWpRn9wQpMG9R9hX3sD158z7EqHWmweQAJU5SA,1
+
+
