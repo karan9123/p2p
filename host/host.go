@@ -2,9 +2,13 @@ package host
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"github.com/hashicorp/yamux"
 	ma "github.com/multiformats/go-multiaddr"
+	"io"
 	"net"
+	"os"
 	cr "p2p/crypto"
 	"p2p/peer"
 )
@@ -30,6 +34,8 @@ type Host interface {
 	Listener() net.Listener
 
 	StartListening() (net.Conn, error)
+
+	SenderConn() (net.Conn, error)
 
 	// Mux returns the Mux multiplexing incoming streams to protocol handlers
 	//Mux() proto.Switch
@@ -67,6 +73,26 @@ func (h *MyHost) StartListening() (net.Conn, error) {
 	}
 	return conn, nil
 
+}
+
+func (h *MyHost) SenderConn() (net.Conn, error) {
+	addr, err := GetAddrFromUser()
+	if err != nil {
+		return nil, err
+	}
+	conn, err := connectTcpIp4(addr)
+	if err != nil {
+		return nil, err
+	}
+	session, err := setupSenderYamux(conn, nil)
+	if err != nil {
+		return nil, err
+	}
+	newConn, err := newStreamYamux(session)
+	if err != nil {
+		return nil, err
+	}
+	return newConn, nil
 }
 
 //func (h *MyHost) Mux() proto.Switch {
@@ -210,4 +236,78 @@ func GetIp4TcpFromMultiaddr(addr ma.Multiaddr) (string, string, error) {
 		return ipAddr, "", err
 	}
 	return ipAddr, tcpPort, nil
+}
+
+// connectTcpIp4 returns tcp connection from multiaddr
+func connectTcpIp4(addr ma.Multiaddr) (*net.TCPConn, error) {
+
+	ipAddr, tcpPort, err := GetIp4TcpFromMultiaddr(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	peerAddr := ipAddr + ":" + tcpPort
+	fmt.Printf("Resolved tcp addr from multiaddr: %s \n", peerAddr)
+
+	//Resolving the TCP address
+	ipAdd, err := net.ResolveTCPAddr("tcp", peerAddr)
+	if err != nil {
+		fmt.Printf("Error resolving TCP address(%s): %s \n", peerAddr, err)
+		return nil, err
+	}
+
+	// Get a TCP connection
+	conn, err := net.DialTCP("tcp", nil, ipAdd)
+	if err != nil {
+		fmt.Printf("Could not establish with peer %s because %s", peerAddr, err.Error())
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+// setupSenderYamux returns yamux session after taking in connection and config
+// set config to nil for default configuration
+func setupSenderYamux(conn io.ReadWriteCloser, config *yamux.Config) (*yamux.Session, error) {
+	session, err := yamux.Client(conn, config)
+	if err != nil {
+		fmt.Printf("Could not wrap yamux on connection because %s \n", err.Error())
+		return nil, err
+	}
+	return session, nil
+}
+
+// newStream takes in a yamux session and returns a multiplexed connection
+func newStreamYamux(session *yamux.Session) (net.Conn, error) {
+	stream, err := session.Open()
+	if err != nil {
+		fmt.Printf("Error opening a new Stream:%s \n", err.Error())
+	}
+	return stream, err
+}
+
+// GetAddrFromUser takes in user input to return a multi address or an error
+func GetAddrFromUser() (ma.Multiaddr, error) {
+	for {
+		fmt.Print("Enter the server multi-address (e.g., /ip4/127.0.0.1/tcp/8000): ")
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		addrStr := scanner.Text()
+
+		// Parsing the entered multi-address.
+		addr, err := ma.NewMultiaddr(addrStr)
+		if err != nil {
+			fmt.Printf("Invalid multiaddress: %s, press r to retry or any other key to exit\n", err)
+			scanner.Scan()
+			input := scanner.Text()
+			if input == "r" {
+				continue
+			} else {
+
+				return nil, errors.New("exit from get Address")
+			}
+		} else {
+			return addr, nil
+		}
+	}
 }
