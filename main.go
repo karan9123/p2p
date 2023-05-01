@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/perlin-network/noise"
 	"github.com/perlin-network/noise/kademlia"
+	"os"
 	"p2p/host"
 )
 
@@ -83,17 +85,10 @@ const (
 
 func main() {
 
-	myHost := host.GetHost("5001")
-	/*myPubKey, err := myHost.ID().ExtractPublicKey()
-	if err != nil {
-		fmt.Printf("Could not extract Public Key from Peer ID because of %s \n", err.Error())
-	}*/
+	myHost := host.GetHost("5031")
 	fmt.Printf("ID: %s\nAddress: %s\n", myHost.ID(), myHost.Addrs())
 
-	//testingTransferSender(myHost)
-	//testingTransferReceiver(myHost)
-
-	/*scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	input := scanner.Text()
 	if input == "rec" {
@@ -115,7 +110,7 @@ func main() {
 		if input == "go" {
 			sendAgain(myHost)
 		}
-	}*/
+	}
 
 	/*scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
