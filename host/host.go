@@ -1,3 +1,10 @@
+/*
+Package host provides a Host object representing a single libp2p node in a peer-to-peer network.
+Host is an object participating in a p2p network, which implements protocols or provides services.
+It handles requests like a Server, and issues requests like a Client.
+It is called Host because it is both Server and Client (and Peer may be confusing).
+This library provides an object MyHost which implements Host interface and its methods.
+*/
 package host
 
 import (
@@ -13,13 +20,14 @@ import (
 	"p2p/peer"
 )
 
+// The string used for the multistream select protocol negotiation
 const (
 	multiStreamSelect   = "/multistream/1.0.0"
 	multiStreamSelectNL = "/multistream/1.0.0\n"
 )
 
 // Host represents a single libp2p node in a peer-to-peer network.
-
+//
 // Host is an object participating in a p2p network, which
 // implements protocols or provides services. It handles
 // requests like a Server, and issues requests like a Client.
@@ -28,24 +36,19 @@ const (
 type Host interface {
 	// ID returns the (local) peer.ID associated with this Host
 	ID() peer.ID
-
 	// Addrs Returns the listen addresses of the Host
 	Addrs() ma.Multiaddr
-
 	// Network  returns the Network interface of the Host
 	Network() net.Interface
-
 	// Listener returns the Listener of the Host
 	Listener() net.Listener
-
+	// StartListening listens to incoming connections on the listener
 	StartListening() (net.Conn, error)
-
+	// SenderConn creates a new outgoing connection
 	SenderConn() (net.Conn, error)
-
-	// Mux returns the Mux multiplexing incoming streams to protocol handlers
-	//Mux() proto.Switch
 }
 
+// MyHost is an implementation of Host interface
 type MyHost struct {
 	peerID   peer.ID
 	addrs    ma.Multiaddr
@@ -54,29 +57,33 @@ type MyHost struct {
 	//mux     proto.Switch
 }
 
+// ID returns the peer ID associated with this host
 func (h *MyHost) ID() peer.ID {
 	return h.peerID
 }
 
+// Addrs returns the listen addresses of the host
 func (h *MyHost) Addrs() ma.Multiaddr {
 	return h.addrs
 }
 
+// Network returns the Network interface of the host
 func (h *MyHost) Network() net.Interface {
 	return h.network
 }
 
+// Listener returns the listener of the host
 func (h *MyHost) Listener() net.Listener {
 	return h.listener
 }
 
+// StartListening listens to incoming connections on the listener
 func (h *MyHost) StartListening() (net.Conn, error) {
 	conn, err := h.Listener().Accept()
 	if err != nil {
 		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
 		return nil, err
 	}
-
 	buf := make([]byte, 1024)
 	i, err := conn.Read(buf)
 	if err != nil {
