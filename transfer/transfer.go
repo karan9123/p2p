@@ -53,7 +53,7 @@ func main() {
 			errorMsg := fmt.Errorf("Error in 'DialTCP': %s", err.Error())
 			println(errorMsg.Error())
 		}
-		err = uploadFile(conn, filename, inputPath, 8)
+		err = UploadFile(conn, filename, inputPath, 8)
 		if err != nil {
 			errorMsg := fmt.Errorf("Error in 'uploadFile': %s", err.Error())
 			println(errorMsg.Error())
@@ -76,7 +76,7 @@ func main() {
 			println(errorMsg.Error())
 		}
 
-		err = receiveFile(receiverConn, outputPath)
+		err = ReceiveFile(receiverConn, outputPath)
 		if err != nil {
 			errorMsg := fmt.Errorf("Error in 'receiveFile': %s", err.Error())
 			println(errorMsg.Error())
@@ -85,8 +85,8 @@ func main() {
 
 }
 
-// uploadFile sends a file to a connected receiver over the specified net.Conn.
-func uploadFile(conn net.Conn, filename, inputPath string, blockSize int) error {
+// UploadFile sends a file to a connected receiver over the specified net.Conn.
+func UploadFile(conn net.Conn, filename, inputPath string, blockSize int) error {
 	file, err := os.Open(inputPath)
 	fmt.Printf("opening %s with inputPath %s \n", filename, inputPath)
 	if err != nil {
@@ -151,8 +151,8 @@ func sendPacket(conn net.Conn, packet Packet) error {
 	return nil
 }
 
-// receiveFile receives a file from a connected sender over the specified net.Conn.
-func receiveFile(conn net.Conn, outputPath string) error {
+// ReceiveFile receives a file from a connected sender over the specified net.Conn.
+func ReceiveFile(conn net.Conn, outputPath string) error {
 	reader := bufio.NewReader(conn)
 
 	filename, err := reader.ReadString('\n')
