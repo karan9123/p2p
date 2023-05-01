@@ -3,9 +3,9 @@ package host
 import (
 	"bufio"
 	"fmt"
-	"github.com/libp2p/go-libp2p/core/protocol"
 	ma "github.com/multiformats/go-multiaddr"
 	"net"
+	cr "p2p/crypto"
 	"p2p/peer"
 )
 
@@ -21,18 +21,80 @@ type Host interface {
 	ID() peer.ID
 
 	// Addrs Returns the listen addresses of the Host
-	Addrs() []ma.Multiaddr
+	Addrs() ma.Multiaddr
 
 	// Network  returns the Network interface of the Host
 	Network() net.Interface
 
 	// Mux returns the Mux multiplexing incoming streams to protocol handlers
-	Mux() protocol.Switch
+	//Mux() proto.Switch
+}
+
+type MyHost struct {
+	peerID  peer.ID
+	addrs   ma.Multiaddr
+	network net.Interface
+	//mux     proto.Switch
+}
+
+func (h *MyHost) ID() peer.ID {
+	return h.peerID
+}
+
+func (h *MyHost) Addrs() ma.Multiaddr {
+	return h.addrs
+}
+
+func (h *MyHost) Network() net.Interface {
+	return h.network
+}
+
+//func (h *MyHost) Mux() proto.Switch {
+//	return h.mux
+//}
+
+func getMyMultiaddr(inface string) (*net.Interface, ma.Multiaddr, error) {
+	iface, err := net.InterfaceByName(inface)
+	if err != nil {
+		fmt.Printf("Could not find the interface because %s \n", err.Error())
+		return nil, nil, err
+	}
+
+	addrs, err := iface.Addrs()
+	if err != nil {
+		fmt.Println(err)
+		return iface, nil, err
+	}
+
+	for _, add := range addrs {
+		fmt.Println(add.Network(), add.String())
+	}
+	var ipAddress net.IP
+	var port string
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				ipAddress = ipnet.IP
+				port = "5200"
+				break
+			}
+		}
+	}
+
+	addrStr := "/ip4/" + ipAddress.String() + "/tcp/" + port
+
+	// Parsing the entered multi-address./ip4/127.0.0.1/tcp/8000
+	addr, err := ma.NewMultiaddr(addrStr)
+	if err != nil {
+		fmt.Printf("Invalid multiaddress: %s, press r to retry or any other key to exit\n", err)
+	}
+	return iface, addr, nil
 }
 
 // ReceiveData reads data from the server and prints received messages.
-func ReceiveData(conn net.Conn) {
+func ReceiveData(conn net.Conn) []byte {
 	reader := bufio.NewReader(conn)
+	var returnLst []byte
 
 	for {
 		// Read a message from the server, terminated by a newline character ('\n').
@@ -44,7 +106,23 @@ func ReceiveData(conn net.Conn) {
 
 		// Print the received message.
 		fmt.Print("Received message: ", msg)
+		returnLst = append(returnLst, []byte(msg)...)
 	}
+	return returnLst
+}
+
+func GetHost() Host {
+	_, pubKey, _ := cr.GenerateKeyPair(1, -1)
+	id, _ := peer.GenerateIDFromPubKey(pubKey)
+	fmt.Println("my ID:", []byte(id))
+	network, addrs, _ := getMyMultiaddr("en0")
+
+	host := &MyHost{
+		peerID:  id,
+		addrs:   addrs,
+		network: *network,
+	}
+	return host
 }
 
 /*func main() {

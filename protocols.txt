@@ -1,0 +1,2 @@
+Default,ipfs/0.1.0,1
+ID,/ipfs/id/1.0.0,1
