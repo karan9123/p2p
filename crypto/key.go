@@ -1,6 +1,3 @@
-// Package crypto implements various cryptographic utilities used by libp2p.
-// This includes a Public and Private key interface and key implementations
-// for supported key algorithms.
 package crypto
 
 import (
@@ -194,75 +191,6 @@ func GenerateRSAKeyPair(_ int, _ io.Reader) (PrivKey, PubKey, error) {
 	// TODO implement me
 	panic("implement me")
 }
-
-/*// UnmarshalPublicKey converts a protobuf serialized public key into its
-// representative object
-func UnmarshalPublicKey(data []byte) (PubKey, error) {
-	// Create a new instance of the protocol buffer message type
-	pmes := new(crypto.PublicKey)
-
-	// Decode the data using a protobuf decoder
-	decoder := NewDecoder(bytes.NewReader(data))
-	err := decoder.Decode(pmes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal public key: %s", err)
-	}
-
-	// Convert the protocol buffer message into a PubKey object
-	key, err := PublicKeyFromProto(pmes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert public key from proto: %s", err)
-	}
-
-	return key, nil
-}
-
-// PublicKeyFromProto converts an unserialized protobuf PublicKey message
-// into its representative object.
-func PublicKeyFromProto(pmes *crypto.PublicKey, proto int) (PubKey, error) {
-	um, ok := MarshalPublicKey(proto)
-	if !ok {
-		return nil, ErrBadKeyType
-	}
-
-	data := pmes
-
-	pk, err := um(data)
-	if err != nil {
-		return nil, err
-	}
-
-	return pk, nil
-}
-
-// MarshalPublicKey converts a public key object into a protobuf serialized
-// public key
-func MarshalPublicKey(k PubKey) ([]byte, error) {
-	pbmes, err := PublicKeyToProto(k)
-	if err != nil {
-		return nil, err
-	}
-
-	return proto.Marshal(pbmes)
-}
-
-// PublicKeyToProto converts a public key object into an unserialized
-// protobuf PublicKey message.
-func PublicKeyToProto(k PubKey) (*crypto.PublicKey, error) {
-	data, err := k.Raw()
-	if err != nil {
-		return nil, err
-	}
-	return &pb.PublicKey{
-		Type: k.Type().Enum(),
-		Data: data,
-	}, nil
-}*/
-
-// UnmarshalPrivateKey converts a protobuf serialized private key into its
-// representative object
-
-// MarshalPrivateKey converts a key object into its protobuf serialized form.
 
 func basicEquals(k1, k2 Key) bool {
 	if k1.Type() != k2.Type() {

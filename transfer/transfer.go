@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -20,19 +19,14 @@ type Packet struct {
 }
 
 const (
-	HOST       = "localhost"
-	PORT       = "8080"
-	TYPE       = "tcp"
-	filename   = "random.txt"
-	inputPath  = "/Users/zubintobias/GolandProjects/Testing/in/random.txt"
-	outputPath = "/Users/zubintobias/GolandProjects/Testing/out"
+	filename1  = "random.txt"
+	inputPath  = "/Users/karan/Documents/Networks/p2p/testingSender/random.txt"
+	outputPath = "/Users/karan/Documents/Networks/p2p/testingReceiver"
 )
 
-func main() {
+/*func main() {
 	// Call uploadFile and receiveFile with your specific parameters
-	//	Open receiver connection first and then run sender or else there will be issues
-	// wherein the sender sends the file with no receiver listening.
-	// Would need to run sender again. (Time Saver!)
+	//	I need to check the command line for the mode = (sender/receiver)
 
 	mode := flag.String("mode", "sender", "To run as a sender or receiver")
 	flag.Parse()
@@ -44,19 +38,18 @@ func main() {
 		tcpServer, err := net.ResolveTCPAddr(TYPE, HOST+":"+PORT)
 		println("tcpServer", tcpServer.String())
 		if err != nil {
-			errorMsg := fmt.Errorf("Error in 'ResolveTCPAddr': %s", err.Error())
-			println(errorMsg.Error())
+			fmt.Errorf("Error in 'ResolveTCPAddr': %s", err.Error())
 		}
 		conn, err := net.Dial(TYPE, tcpServer.String())
-		println("connection ", conn)
 		if err != nil {
-			errorMsg := fmt.Errorf("Error in 'DialTCP': %s", err.Error())
-			println(errorMsg.Error())
+			errstr := fmt.Errorf("Error in 'Dial': %s", err.Error())
+			println(errstr.Error())
+		} else {
+			println("connection ", conn)
 		}
 		err = UploadFile(conn, filename, inputPath, 8)
 		if err != nil {
-			errorMsg := fmt.Errorf("Error in 'uploadFile': %s", err.Error())
-			println(errorMsg.Error())
+			fmt.Errorf("Error in 'uploadFile': %s", err.Error())
 		}
 	}
 
@@ -65,25 +58,26 @@ func main() {
 		println("Starting program as receiver....")
 		listen, err := net.Listen(TYPE, HOST+":"+PORT)
 		if err != nil {
-			errorMsg := fmt.Errorf("Error in 'Listen': %s", err.Error())
-			println(errorMsg.Error())
+			errormsg := fmt.Errorf("Error in 'Listen': %s", err.Error())
+			println(errormsg.Error())
 		}
 		defer listen.Close()
 
 		receiverConn, err := listen.Accept()
 		if err != nil {
-			errorMsg := fmt.Errorf("Error in 'Accept': %s", err.Error())
-			println(errorMsg.Error())
+			errormsg := fmt.Errorf("Error in 'Accept': %s", err.Error())
+			println(errormsg.Error())
 		}
 
 		err = ReceiveFile(receiverConn, outputPath)
 		if err != nil {
-			errorMsg := fmt.Errorf("Error in 'receiveFile': %s", err.Error())
-			println(errorMsg.Error())
+			errormsg := fmt.Errorf("Error in 'receiveFile': %s", err.Error())
+			println(errormsg.Error())
+
 		}
 	}
 
-}
+}*/
 
 // UploadFile sends a file to a connected receiver over the specified net.Conn.
 func UploadFile(conn net.Conn, filename, inputPath string, blockSize int) error {
@@ -160,24 +154,33 @@ func ReceiveFile(conn net.Conn, outputPath string) error {
 		return fmt.Errorf("error reading filename: %v", err)
 	}
 	filename = strings.TrimSpace(filename)
+	fmt.Printf("fileName: %s \n", filename)
 
 	fileSizeStr, err := reader.ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("error reading file size: %v", err)
 	}
-	fileSizeStr = strings.TrimSpace(fileSizeStr)
-	fileSize, err := strconv.ParseInt(fileSizeStr, 10, 64)
+	fmt.Printf("filesizeStr: %s\n", fileSizeStr)
+	fileSizeStr = strings.ReplaceAll(fileSizeStr, " ", "")
+	fileSizeStr = strings.ReplaceAll(fileSizeStr, "\n", "")
+	fmt.Println("f", fileSizeStr)
+	k := string(fileSizeStr)
+	fmt.Println("k", []byte(k))
+	fileSize, err := strconv.Atoi(k)
 	if err != nil {
-		return fmt.Errorf("error parsing file size: %v", err)
-	}
+		fmt.Printf("error converting file size because of%s\n", err.Error())
 
-	outputFile, err := os.Create(outputPath + "/" + filename)
+	}
+	fmt.Println("filesize:", fileSize)
+
+	outputFile, err := os.Create(outputPath + "/random.txt")
 	if err != nil {
 		return fmt.Errorf("error creating output file: %v", err)
 	}
 	defer outputFile.Close()
+	fmt.Printf("file %s created\n", outputFile)
 
-	var receivedBytes int64
+	var receivedBytes int
 	for receivedBytes < fileSize {
 		packet, err := receivePacket(conn)
 		if err != nil {
@@ -185,7 +188,7 @@ func ReceiveFile(conn net.Conn, outputPath string) error {
 		}
 
 		outputFile.Write(packet.Data)
-		receivedBytes += int64(packet.Size)
+		receivedBytes += int(packet.Size)
 	}
 
 	return nil

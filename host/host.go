@@ -13,6 +13,11 @@ import (
 	"p2p/peer"
 )
 
+const (
+	multiStreamSelect   = "/multistream/1.0.0"
+	multiStreamSelectNL = "/multistream/1.0.0\n"
+)
+
 // Host represents a single libp2p node in a peer-to-peer network.
 
 // Host is an object participating in a p2p network, which
@@ -71,6 +76,29 @@ func (h *MyHost) StartListening() (net.Conn, error) {
 		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
 		return nil, err
 	}
+
+	buf := make([]byte, 1024)
+	i, err := conn.Read(buf)
+	if err != nil {
+		fmt.Printf("Error %s encountered while readed\n", err.Error())
+		return nil, err
+	}
+	//fmt.Printf("reading %d bytes which are: %s\n", i, buf[:i])
+	i, err = conn.Read(buf)
+	if err != nil {
+		fmt.Printf("Error %s encountered while readed\n", err.Error())
+		return nil, err
+	}
+	temp := string(buf[:i-1])
+
+	tempbuf := buf[:i-1]
+
+	fmt.Printf("reading again %d bytes which are: %s and multi is %s\n", i, "|"+temp+"|", "|"+multiStreamSelect+"|")
+	if string(tempbuf[len(tempbuf)-18:]) != multiStreamSelect {
+		fmt.Printf("Sender does not support multisteam select, Abort connection\n")
+		return nil, errors.New("sender does not multi-stream-select")
+	}
+	fmt.Printf("Sender supports multisteam select. Hooray!!!\n")
 	return conn, nil
 
 }
@@ -90,6 +118,11 @@ func (h *MyHost) SenderConn() (net.Conn, error) {
 	}
 	newConn, err := newStreamYamux(session)
 	if err != nil {
+		return nil, err
+	}
+	_, err = newConn.Write([]byte(multiStreamSelectNL))
+	if err != nil {
+		fmt.Printf("Could not write on stream because %s\n", err.Error())
 		return nil, err
 	}
 	return newConn, nil
@@ -154,6 +187,8 @@ func _(conn net.Conn) []byte {
 func GetHost(port string) Host {
 	_, pubKey, _ := cr.GenerateKeyPair(1, -1)
 	id, _ := peer.GenerateIDFromPubKey(pubKey)
+
+	fmt.Printf("pubkey is %s, id is %s\n", pubKey, id)
 	network, addrs, _ := getMyMultiaddr("en0", port)
 	ip4, tcpPort, _ := GetIp4TcpFromMultiaddr(addrs)
 
