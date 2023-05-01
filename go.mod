@@ -4,11 +4,9 @@ go 1.20
 
 require (
 	github.com/hashicorp/yamux v0.1.1
-	github.com/libp2p/go-libp2p v0.27.1
 	github.com/multiformats/go-multiaddr v0.9.0
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/multiformats/go-multistream v0.4.1
-	google.golang.org/protobuf v1.30.0
 )
 
 require (

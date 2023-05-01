@@ -95,10 +95,6 @@ func (h *MyHost) SenderConn() (net.Conn, error) {
 	return newConn, nil
 }
 
-//func (h *MyHost) Mux() proto.Switch {
-//	return h.mux
-//}
-
 func getMyMultiaddr(inface, tcpPort string) (*net.Interface, ma.Multiaddr, error) {
 	iface, err := net.InterfaceByName(inface)
 	if err != nil {
@@ -136,7 +132,7 @@ func getMyMultiaddr(inface, tcpPort string) (*net.Interface, ma.Multiaddr, error
 }
 
 // ReceiveData reads data from the server and prints received messages.
-func ReceiveData(conn net.Conn) []byte {
+func _(conn net.Conn) []byte {
 	reader := bufio.NewReader(conn)
 	var returnLst []byte
 
@@ -176,52 +172,6 @@ func GetHost(port string) Host {
 	}
 	return host
 }
-
-/*func main() {
-
-	addr, err := GetAddrFromUser()
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	PrintProtocols(addr)
-	ipAddr, err := addr.ValueForProtocol(ma.P_IP4)
-	if err != nil {
-		fmt.Println("Could not get ipv4 address from the given multiadress")
-	}
-	tcpPort, err := addr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		fmt.Println("Could not get TCP Port from the given multiadress")
-	}
-	peerAddr := ipAddr + ":" + tcpPort
-	fmt.Println(peerAddr)
-
-	//Resolving the TCP address
-	ipAdd, err := net.ResolveTCPAddr("tcp", peerAddr)
-	if err != nil {
-		fmt.Printf("Error resolving TCP address: %s\n", err)
-		return
-	}
-	fmt.Println(ipAdd)
-
-	// Establish a TCP connection to the server.
-	conn, err := net.DialTCP("tcp", nil, ipAdd)
-	if err != nil {
-		fmt.Println("Error connecting to server:", err)
-		return
-	}
-	defer func(conn *net.TCPConn) {
-		err := conn.Close()
-		if err != nil {
-			fmt.Println("error: ", err.Error())
-		}
-	}(conn) // Ensure the connection is closed when the function returns.
-
-	fmt.Println("Connected to peer:", addr.String())
-
-	go receiveData(conn)
-
-}*/
 
 func GetIp4TcpFromMultiaddr(addr ma.Multiaddr) (string, string, error) {
 	ipAddr, err := addr.ValueForProtocol(ma.P_IP4)

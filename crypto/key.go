@@ -10,10 +10,10 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"github.com/libp2p/go-libp2p/core/crypto/pb"
-	"google.golang.org/protobuf/proto"
 	"io"
 )
+
+type KeyType int32
 
 const (
 	// RSA is an enum for the supported RSA key type
@@ -29,11 +29,11 @@ var (
 	ErrBadKeyType = errors.New("invalid or unsupported key type")
 )
 
-// PubKeyUnmarshalled is a func that creates a PubKey from a given slice of bytes
-type PubKeyUnmarshalled func(data []byte) (PubKey, error)
+// PubKeyUnmarshaller is a func that creates a PubKey from a given slice of bytes
+type PubKeyUnmarshaller func(data []byte) (PubKey, error)
 
-// PrivKeyUnmarshalled is a func that creates a PrivKey from a given slice of bytes
-type PrivKeyUnmarshalled func(data []byte) (PrivKey, error)
+// PrivKeyUnmarshaller is a func that creates a PrivKey from a given slice of bytes
+type PrivKeyUnmarshaller func(data []byte) (PrivKey, error)
 
 // Ed25519PrivateKey is an ed25519 private key.
 type Ed25519PrivateKey struct {
@@ -46,15 +46,10 @@ type Ed25519PublicKey struct {
 }
 
 // PubKeyUnmarshallers is a map of unmarshallers by key type
-var PubKeyUnmarshallers = map[int]PubKeyUnmarshalled{
+var PubKeyUnmarshallers = map[int]PubKeyUnmarshaller{
 	RSA:     UnmarshalRsaPublicKey,
 	Ed25519: UnmarshalEd25519PublicKey,
 	ECDSA:   UnmarshalECDSAPublicKey,
-}
-
-func UnmarshalECDSAPublicKey(_ []byte) (PubKey, error) {
-	// TODO implement me
-	panic("implement me")
 }
 
 // UnmarshalEd25519PublicKey returns a public key from input bytes.
@@ -67,22 +62,20 @@ func UnmarshalEd25519PublicKey(data []byte) (PubKey, error) {
 		k: ed25519.PublicKey(data),
 	}, nil
 }
-
+func UnmarshalECDSAPublicKey(_ []byte) (PubKey, error) {
+	// TODO implement me
+	panic("implement me")
+}
 func UnmarshalRsaPublicKey(_ []byte) (PubKey, error) {
 	// TODO implement me
 	panic("implement me")
 }
 
 // PrivKeyUnmarshallers is a map of unmarshallers by key type
-var PrivKeyUnmarshallers = map[pb.KeyType]PrivKeyUnmarshalled{
-	pb.KeyType_RSA:     UnmarshalRsaPrivateKey,
-	pb.KeyType_Ed25519: UnmarshalEd25519PrivateKey,
-	pb.KeyType_ECDSA:   UnmarshalECDSAPrivateKey,
-}
-
-func UnmarshalECDSAPrivateKey(_ []byte) (PrivKey, error) {
-	// TODO implement me
-	panic("implement me")
+var _ = map[int]PrivKeyUnmarshaller{
+	RSA:     UnmarshalRsaPrivateKey,
+	Ed25519: UnmarshalEd25519PrivateKey,
+	ECDSA:   UnmarshalECDSAPrivateKey,
 }
 
 func UnmarshalEd25519PrivateKey(data []byte) (PrivKey, error) {
@@ -113,7 +106,10 @@ func UnmarshalEd25519PrivateKey(data []byte) (PrivKey, error) {
 		k: ed25519.PrivateKey(data),
 	}, nil
 }
-
+func UnmarshalECDSAPrivateKey(_ []byte) (PrivKey, error) {
+	// TODO implement me
+	panic("implement me")
+}
 func UnmarshalRsaPrivateKey(_ []byte) (PrivKey, error) {
 	// TODO implement me
 	panic("implement me")
@@ -131,7 +127,7 @@ type Key interface {
 	Raw() ([]byte, error)
 
 	// Type returns the protobuf key type.
-	Type() pb.KeyType
+	Type() KeyType
 }
 
 // PrivKey represents a private key that can be used to generate a public key and sign data
@@ -145,7 +141,7 @@ type PrivKey interface {
 	GetPublic() PubKey
 }
 
-// PubKey is a public key that can be used to verifiy data signed with the corresponding private key
+// PubKey is a public key that can be used to verify data signed with the corresponding private key
 type PubKey interface {
 	Key
 
@@ -167,7 +163,7 @@ func GenerateKeyPairWithReader(typ, bits int, src io.Reader) (PrivKey, PubKey, e
 	case RSA:
 		return GenerateRSAKeyPair(bits, src)
 	case Ed25519:
-		return GenerateEd25519Key(src)
+		return GenerateEd25519KeyPair(src)
 	case ECDSA:
 		return GenerateECDSAKeyPair(src)
 	default:
@@ -175,13 +171,8 @@ func GenerateKeyPairWithReader(typ, bits int, src io.Reader) (PrivKey, PubKey, e
 	}
 }
 
-func GenerateECDSAKeyPair(_ io.Reader) (PrivKey, PubKey, error) {
-	// TODO implement me
-	panic("implement me")
-}
-
-// GenerateEd25519Key generates a new ed25519 private and public key pair.
-func GenerateEd25519Key(src io.Reader) (PrivKey, PubKey, error) {
+// GenerateEd25519KeyPair generates a new ed25519 private and public key pair.
+func GenerateEd25519KeyPair(src io.Reader) (PrivKey, PubKey, error) {
 	pub, priv, err := ed25519.GenerateKey(src)
 	if err != nil {
 		return nil, nil, err
@@ -195,33 +186,46 @@ func GenerateEd25519Key(src io.Reader) (PrivKey, PubKey, error) {
 		},
 		nil
 }
-
+func GenerateECDSAKeyPair(_ io.Reader) (PrivKey, PubKey, error) {
+	// TODO implement me
+	panic("implement me")
+}
 func GenerateRSAKeyPair(_ int, _ io.Reader) (PrivKey, PubKey, error) {
 	// TODO implement me
 	panic("implement me")
 }
 
-// UnmarshalPublicKey converts a protobuf serialized public key into its
+/*// UnmarshalPublicKey converts a protobuf serialized public key into its
 // representative object
 func UnmarshalPublicKey(data []byte) (PubKey, error) {
-	pmes := new(pb.PublicKey)
-	err := proto.Unmarshal(data, pmes)
+	// Create a new instance of the protocol buffer message type
+	pmes := new(crypto.PublicKey)
+
+	// Decode the data using a protobuf decoder
+	decoder := NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(pmes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal public key: %s", err)
 	}
 
-	return PublicKeyFromProto(pmes)
+	// Convert the protocol buffer message into a PubKey object
+	key, err := PublicKeyFromProto(pmes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert public key from proto: %s", err)
+	}
+
+	return key, nil
 }
 
 // PublicKeyFromProto converts an unserialized protobuf PublicKey message
 // into its representative object.
-func PublicKeyFromProto(pmes *pb.PublicKey) (PubKey, error) {
-	um, ok := PubKeyUnmarshallers[int(pmes.GetType())]
+func PublicKeyFromProto(pmes *crypto.PublicKey, proto int) (PubKey, error) {
+	um, ok := MarshalPublicKey(proto)
 	if !ok {
 		return nil, ErrBadKeyType
 	}
 
-	data := pmes.GetData()
+	data := pmes
 
 	pk, err := um(data)
 	if err != nil {
@@ -244,7 +248,7 @@ func MarshalPublicKey(k PubKey) ([]byte, error) {
 
 // PublicKeyToProto converts a public key object into an unserialized
 // protobuf PublicKey message.
-func PublicKeyToProto(k PubKey) (*pb.PublicKey, error) {
+func PublicKeyToProto(k PubKey) (*crypto.PublicKey, error) {
 	data, err := k.Raw()
 	if err != nil {
 		return nil, err
@@ -253,7 +257,7 @@ func PublicKeyToProto(k PubKey) (*pb.PublicKey, error) {
 		Type: k.Type().Enum(),
 		Data: data,
 	}, nil
-}
+}*/
 
 // UnmarshalPrivateKey converts a protobuf serialized private key into its
 // representative object
@@ -282,8 +286,8 @@ func basicEquals(k1, k2 Key) bool {
 }
 
 // Type of the private key (Ed25519).
-func (k *Ed25519PrivateKey) Type() pb.KeyType {
-	return pb.KeyType_Ed25519
+func (k *Ed25519PrivateKey) Type() KeyType {
+	return Ed25519
 }
 
 // Raw private key bytes.
@@ -325,8 +329,8 @@ func (k *Ed25519PrivateKey) Sign(msg []byte) (res []byte, err error) {
 }
 
 // Type of the public key (Ed25519).
-func (k *Ed25519PublicKey) Type() pb.KeyType {
-	return pb.KeyType_Ed25519
+func (k *Ed25519PublicKey) Type() KeyType {
+	return Ed25519
 }
 
 // Raw public key bytes.
@@ -355,4 +359,12 @@ func (k *Ed25519PublicKey) Verify(data []byte, sig []byte) (success bool, err er
 		}
 	}()*/
 	return ed25519.Verify(k.k, data, sig), nil
+}
+
+func MarshalPublicKey(pubKey PubKey) ([]byte, error) {
+	return pubKey.Raw()
+}
+
+func UnmarshalPublicKey(blst []byte) (PubKey, error) {
+	return PubKeyUnmarshallers[1](blst)
 }

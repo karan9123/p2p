@@ -23,8 +23,23 @@ func main() {
 	fmt.Println(myHost.ID(), myHost.Addrs(), myHost.Network().HardwareAddr)
 	PrintProtocols(myHost.Addrs())
 
-	//listeningConn, _ := myHost.StartListening()
+}
 
-	//sendingConn := myHost.SenderConn()
+func receiverMethod(myHost host.Host) {
+	conn, err := myHost.StartListening()
+	if err != nil {
+		fmt.Println("Couldn't listen due to ", err.Error())
+	}
+	buf := make([]byte, 1024)
+	i, err := conn.Read(buf)
+	fmt.Printf("read %d bytes which are %s\n", i, buf[:i])
+}
 
+func senderMethod(myHost host.Host) {
+	sendingConn, _ := myHost.SenderConn()
+	i, err := sendingConn.Write([]byte("hello"))
+	if err != nil {
+		return
+	}
+	fmt.Printf("Wrote %d bytes\n", i)
 }
