@@ -24,8 +24,8 @@ const (
 	PORT       = "8080"
 	TYPE       = "tcp"
 	filename   = "random.txt"
-	inputPath  = "/Users/zubintobias/GolandProjects/Testing/in/random.txt"
-	outputPath = "/Users/zubintobias/GolandProjects/Testing/out"
+	inputPath  = "testingSender/random.txt"
+	outputPath = "testingReceiver"
 )
 
 func main() {
