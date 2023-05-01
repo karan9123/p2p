@@ -1,6 +1,6 @@
 module p2p
 
-go 1.20
+go 1.19
 
 require (
 	github.com/hashicorp/yamux v0.1.1
