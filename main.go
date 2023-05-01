@@ -52,7 +52,7 @@ func PrintProtocols(addr ma.Multiaddr) {
 // connectTcpIp4 returns tcp connection from multiaddr
 func connectTcpIp4(addr ma.Multiaddr) (*net.TCPConn, error) {
 
-	ipAddr, tcpPort, err := getIp4TcpFromMultiaddr(addr)
+	ipAddr, tcpPort, err := host.GetIp4TcpFromMultiaddr(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -75,21 +75,6 @@ func connectTcpIp4(addr ma.Multiaddr) (*net.TCPConn, error) {
 	}
 
 	return conn, nil
-}
-
-func getIp4TcpFromMultiaddr(addr ma.Multiaddr) (string, string, error) {
-	ipAddr, err := addr.ValueForProtocol(ma.P_IP4)
-	if err != nil {
-		fmt.Printf("Could not get ipv4 address from the given multiadress because %s \n", err.Error())
-		return "", "", err
-	}
-
-	tcpPort, err := addr.ValueForProtocol(ma.P_TCP)
-	if err != nil {
-		fmt.Printf("Could not get TCP Port from the given multiadress %s \n", err.Error())
-		return ipAddr, "", err
-	}
-	return ipAddr, tcpPort, nil
 }
 
 // setupSenderYamux returns yamux session after taking in connection and config
@@ -117,11 +102,11 @@ func main() {
 	//fmt.Printf("List the protocols you support. Don't lie and don't be shy, go ahead list em all")
 	//protos, err := proto.GetProtocols("protocols.txt")
 
-	/*myHost := host.GetHost()
-
+	myHost := host.GetHost("5002")
 	fmt.Println(myHost.ID(), myHost.Addrs(), myHost.Network().HardwareAddr)
-
 	PrintProtocols(myHost.Addrs())
+
+	go myHost.StartListening()
 
 	addr, _ := GetAddrFromUser()
 	conn, _ := connectTcpIp4(addr)
@@ -132,7 +117,7 @@ func main() {
 	if err != nil {
 		fmt.Println("error in writing:", err)
 		return
-	}*/
+	}
 
 	/*
 		addr, err := GetAddrFromUser()
@@ -164,24 +149,14 @@ func main() {
 		go host.ReceiveData(conn)
 	*/
 
-	myHost := host.GetHost()
-
+	/*myHost := host.GetHost()
 	fmt.Println(myHost.ID(), myHost.Addrs(), myHost.Network().HardwareAddr)
-
 	PrintProtocols(myHost.Addrs())
 
-	ip4, tcpPort, _ := getIp4TcpFromMultiaddr(myHost.Addrs())
-
-	li, err := net.Listen("tcp", ip4+":"+tcpPort)
-	if err != nil {
-		fmt.Printf("Could not listen on Address %s \n because %s", ip4+":"+tcpPort, err.Error())
-	}
-
-	conn, err := li.Accept()
+	conn, err := myHost.Listener().Accept()
 	if err != nil {
 		fmt.Printf("Could not accept connection on %s because %s\n", myHost.Addrs(), err.Error())
 	}
-
-	fmt.Println(conn.LocalAddr())
+	fmt.Println(conn.LocalAddr())*/
 
 }

@@ -26,14 +26,20 @@ type Host interface {
 	// Network  returns the Network interface of the Host
 	Network() net.Interface
 
+	// Listener returns the Listener of the Host
+	Listener() net.Listener
+
+	StartListening()
+
 	// Mux returns the Mux multiplexing incoming streams to protocol handlers
 	//Mux() proto.Switch
 }
 
 type MyHost struct {
-	peerID  peer.ID
-	addrs   ma.Multiaddr
-	network net.Interface
+	peerID   peer.ID
+	addrs    ma.Multiaddr
+	network  net.Interface
+	listener net.Listener
 	//mux     proto.Switch
 }
 
@@ -49,11 +55,29 @@ func (h *MyHost) Network() net.Interface {
 	return h.network
 }
 
+func (h *MyHost) Listener() net.Listener {
+	return h.listener
+}
+
+func (h *MyHost) StartListening() {
+	conn, err := h.Listener().Accept()
+	if err != nil {
+		fmt.Printf("Could not accept connection on %s because %s\n", h.Addrs(), err.Error())
+	}
+	var buf []byte
+	_, err = conn.Read(buf)
+	if err != nil {
+		fmt.Printf("Could not read because %s\n", err.Error())
+	}
+	fmt.Println(buf)
+
+}
+
 //func (h *MyHost) Mux() proto.Switch {
 //	return h.mux
 //}
 
-func getMyMultiaddr(inface string) (*net.Interface, ma.Multiaddr, error) {
+func getMyMultiaddr(inface, tcpPort string) (*net.Interface, ma.Multiaddr, error) {
 	iface, err := net.InterfaceByName(inface)
 	if err != nil {
 		fmt.Printf("Could not find the interface because %s \n", err.Error())
@@ -70,18 +94,16 @@ func getMyMultiaddr(inface string) (*net.Interface, ma.Multiaddr, error) {
 		fmt.Println(add.Network(), add.String())
 	}
 	var ipAddress net.IP
-	var port string
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
 				ipAddress = ipnet.IP
-				port = "5200"
 				break
 			}
 		}
 	}
 
-	addrStr := "/ip4/" + ipAddress.String() + "/tcp/" + port
+	addrStr := "/ip4/" + ipAddress.String() + "/tcp/" + tcpPort
 
 	// Parsing the entered multi-address./ip4/127.0.0.1/tcp/8000
 	addr, err := ma.NewMultiaddr(addrStr)
@@ -111,16 +133,24 @@ func ReceiveData(conn net.Conn) []byte {
 	return returnLst
 }
 
-func GetHost() Host {
+func GetHost(port string) Host {
 	_, pubKey, _ := cr.GenerateKeyPair(1, -1)
 	id, _ := peer.GenerateIDFromPubKey(pubKey)
+	network, addrs, _ := getMyMultiaddr("en0", port)
+	ip4, tcpPort, _ := GetIp4TcpFromMultiaddr(addrs)
+
+	listener, err := net.Listen("tcp", ip4+":"+tcpPort)
+	if err != nil {
+		fmt.Printf("Could not listen on Address %s \n because %s", ip4+":"+tcpPort, err.Error())
+	}
 	fmt.Println("my ID:", []byte(id))
-	network, addrs, _ := getMyMultiaddr("en0")
+	fmt.Println("listening on port: ", tcpPort)
 
 	host := &MyHost{
-		peerID:  id,
-		addrs:   addrs,
-		network: *network,
+		peerID:   id,
+		addrs:    addrs,
+		network:  *network,
+		listener: listener,
 	}
 	return host
 }
@@ -170,3 +200,18 @@ func GetHost() Host {
 	go receiveData(conn)
 
 }*/
+
+func GetIp4TcpFromMultiaddr(addr ma.Multiaddr) (string, string, error) {
+	ipAddr, err := addr.ValueForProtocol(ma.P_IP4)
+	if err != nil {
+		fmt.Printf("Could not get ipv4 address from the given multiadress because %s \n", err.Error())
+		return "", "", err
+	}
+
+	tcpPort, err := addr.ValueForProtocol(ma.P_TCP)
+	if err != nil {
+		fmt.Printf("Could not get TCP Port from the given multiadress %s \n", err.Error())
+		return ipAddr, "", err
+	}
+	return ipAddr, tcpPort, nil
+}
