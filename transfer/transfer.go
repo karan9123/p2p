@@ -25,12 +25,14 @@ const (
 	TYPE       = "tcp"
 	filename   = "random.txt"
 	inputPath  = "/Users/zubintobias/GolandProjects/Testing/in/random.txt"
-	outputPath = "/Users/zubintobias/GolandProjects/Testing/out/outputFile.txt"
+	outputPath = "/Users/zubintobias/GolandProjects/Testing/out"
 )
 
 func main() {
 	// Call uploadFile and receiveFile with your specific parameters
-	//	I need to check the command line for the mode = (sender/receiver)
+	//	Open receiver connection first and then run sender or else there will be issues
+	// wherein the sender sends the file with no receiver listening.
+	// Would need to run sender again. (Time Saver!)
 
 	mode := flag.String("mode", "sender", "To run as a sender or receiver")
 	flag.Parse()
@@ -42,16 +44,19 @@ func main() {
 		tcpServer, err := net.ResolveTCPAddr(TYPE, HOST+":"+PORT)
 		println("tcpServer", tcpServer.String())
 		if err != nil {
-			fmt.Errorf("Error in 'ResolveTCPAddr': %s", err.Error())
+			errorMsg := fmt.Errorf("Error in 'ResolveTCPAddr': %s", err.Error())
+			println(errorMsg.Error())
 		}
 		conn, err := net.Dial(TYPE, tcpServer.String())
 		println("connection ", conn)
 		if err != nil {
-			fmt.Errorf("Error in 'DialTCP': %s", err.Error())
+			errorMsg := fmt.Errorf("Error in 'DialTCP': %s", err.Error())
+			println(errorMsg.Error())
 		}
 		err = uploadFile(conn, filename, inputPath, 8)
 		if err != nil {
-			fmt.Errorf("Error in 'uploadFile': %s", err.Error())
+			errorMsg := fmt.Errorf("Error in 'uploadFile': %s", err.Error())
+			println(errorMsg.Error())
 		}
 	}
 
@@ -60,18 +65,21 @@ func main() {
 		println("Starting program as receiver....")
 		listen, err := net.Listen(TYPE, HOST+":"+PORT)
 		if err != nil {
-			fmt.Errorf("Error in 'Listen': %s", err.Error())
+			errorMsg := fmt.Errorf("Error in 'Listen': %s", err.Error())
+			println(errorMsg.Error())
 		}
 		defer listen.Close()
 
 		receiverConn, err := listen.Accept()
 		if err != nil {
-			fmt.Errorf("Error in 'Accept': %s", err.Error())
+			errorMsg := fmt.Errorf("Error in 'Accept': %s", err.Error())
+			println(errorMsg.Error())
 		}
 
 		err = receiveFile(receiverConn, outputPath)
 		if err != nil {
-			fmt.Errorf("Error in 'receiveFile': %s", err.Error())
+			errorMsg := fmt.Errorf("Error in 'receiveFile': %s", err.Error())
+			println(errorMsg.Error())
 		}
 	}
 
