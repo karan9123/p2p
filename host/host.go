@@ -348,7 +348,7 @@ func GetHost(port string) Host {
 	id, _ := peer.GenerateIDFromPubKey(pubKey)
 
 	// Obtain the local multiaddress, IPv4 address, and TCP port.
-	network, addrs, _ := getMyMultiaddr("en0", port)
+	network, addrs, _ := getMyMultiaddr("eth0", port)
 	ip4, tcpPort, _ := GetIp4TcpFromMultiaddr(addrs)
 
 	// Set up a TCP listener on the local IPv4 address and TCP port.
